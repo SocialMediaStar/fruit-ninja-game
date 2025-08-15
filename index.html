@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Fruit Ninja (brauseris)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div class="hud">
+    <div class="left">
+      <span id="score">0</span> <span class="points-label">punkti</span>
+    </div>
+    <div class="right">
+      <span id="livesIcons" class="lives"></span>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <img class="title" src="start screen/Asset 1@4x.png" alt="Fruit Ninja" />
+    <div class="final" id="final">
+      <div id="finalScore" class="final-score">0</div>
+      <div class="final-label">SINU SKOOR</div>
+    </div>
+    <p id="introText">Mis ei mahu pitsale ega kokteili peale, peab jõudma gini sisse! Lõika koriandrid, greibid ja basiilikud ribadeks enne, kui kelner nad kompostihunnikusse saadab.</p>
+    <div class="controls">
+      <button id="startBtn">Alusta</button>
+    </div>
+    <div id="scoreMsg" class="score-msg"></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+
+
