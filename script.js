@@ -2,6 +2,7 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
 const overlay = document.getElementById('overlay');
+const overlayTitleImg = document.querySelector('.overlay .title');
 const startBtn = document.getElementById('startBtn');
 const introTextEl = document.getElementById('introText');
 const scoreMsgEl = document.getElementById('scoreMsg');
@@ -483,5 +484,52 @@ requestAnimationFrame(frame);
 ['pointerdown','touchstart','keydown'].forEach((evt) => {
   document.addEventListener(evt, ensureBgm, { once: true, passive: true });
 });
+
+// Parallax effect for title image on the start screen
+if (overlay && overlayTitleImg) {
+  let parallaxX = 0;
+  let parallaxY = 0;
+  let targetX = 0;
+  let targetY = 0;
+  const strength = 14; // px offset at edges
+  const damp = 0.12; // smoothing
+
+  function updateParallax() {
+    parallaxX += (targetX - parallaxX) * damp;
+    parallaxY += (targetY - parallaxY) * damp;
+    overlayTitleImg.style.transform = `translate3d(${parallaxX}px, ${parallaxY}px, 0)`;
+    if (overlay.style.display !== 'none') requestAnimationFrame(updateParallax);
+  }
+
+  function setTargetFromPos(x, y) {
+    const rect = overlay.getBoundingClientRect();
+    const nx = (x - rect.left) / rect.width - 0.5; // -0.5..0.5
+    const ny = (y - rect.top) / rect.height - 0.5;
+    targetX = -nx * strength;
+    targetY = -ny * strength;
+  }
+
+  overlay.addEventListener('mousemove', (e) => {
+    setTargetFromPos(e.clientX, e.clientY);
+  });
+  overlay.addEventListener('touchmove', (e) => {
+    const t = e.changedTouches[0];
+    setTargetFromPos(t.clientX, t.clientY);
+  }, { passive: true });
+  overlay.addEventListener('mouseenter', (e) => {
+    setTargetFromPos(e.clientX, e.clientY);
+    requestAnimationFrame(updateParallax);
+  });
+  overlay.addEventListener('touchstart', (e) => {
+    const t = e.changedTouches[0];
+    setTargetFromPos(t.clientX, t.clientY);
+    requestAnimationFrame(updateParallax);
+  }, { passive: true });
+  // Reset when starting the game
+  startBtn.addEventListener('click', () => {
+    targetX = targetY = parallaxX = parallaxY = 0;
+    overlayTitleImg.style.transform = 'translate3d(0,0,0)';
+  });
+}
 
 

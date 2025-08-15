@@ -1,7 +1,14 @@
 html, body {
   margin: 0;
   height: 100%;
-  background: linear-gradient(180deg, #f7b618, #fed502);
+  /* Use SVG background during gameplay (canvas is transparent) */
+  background: #f7b618;
+  background-image: url('Asset 2.svg');
+  /* Make logo twice smaller than before and keep it centered */
+  background-size: 30% auto;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: #f2f5f7;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
   overflow: hidden;
@@ -121,6 +128,23 @@ html, body {
   cursor: pointer;
 }
 
+.sound-toggle {
+  margin-left: 12px;
+  padding: 6px 10px;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  background: #0b0d14;
+  pointer-events: auto;
+}
+
+.sound-toggle[aria-pressed="true"] {
+  background: #4b5563;
+}
+
 .overlay .controls {
   display: flex;
   gap: 12px;
@@ -130,6 +154,8 @@ html, body {
   width: min(70vw, 520px);
   height: auto;
   filter: drop-shadow(0 10px 24px rgba(0,0,0,0.25));
+  will-change: transform;
+  transition: transform 120ms ease-out;
 }
 
 .overlay p {
