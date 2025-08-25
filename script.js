@@ -11,6 +11,7 @@ const finalScoreEl = document.getElementById('finalScore');
 const scoreEl = document.getElementById('score');
 const livesIconsEl = document.getElementById('livesIcons');
 const soundToggleBtn = document.getElementById('soundToggleBtn');
+const getAllSoundToggleBtns = () => Array.from(document.querySelectorAll('.sound-toggle'));
 
 // Reduce rendering scale on mobile for performance/battery
 const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -38,6 +39,20 @@ const TAU = Math.PI * 2;
 function rand(min, max) { return Math.random() * (max - min) + min; }
 function choice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
+// Weighted choice helper: returns an element from arr based on weights
+function weightedChoice(arr, weightFn) {
+  const weights = arr.map(weightFn);
+  let total = 0;
+  for (let i = 0; i < weights.length; i++) total += Math.max(0, weights[i]);
+  if (total <= 0) return choice(arr);
+  let r = Math.random() * total;
+  for (let i = 0; i < arr.length; i++) {
+    r -= Math.max(0, weights[i]);
+    if (r <= 0) return arr[i];
+  }
+  return arr[arr.length - 1];
+}
+
 // Sprites
 const fruitSpriteNames = [
   '1.png','2.png','3.png','b1.png','b2.png','b3.png','c1.png','c2.png','c3.png','c4.png'
@@ -51,10 +66,23 @@ function getImage(src) {
   return img;
 }
 
+// Bomb image
+const bombImg = new Image();
+bombImg.src = 'bomb.png';
+
 // Tuning
 const GRAVITY_FRUIT = 900;
 const GRAVITY_BOMB = 900;
 const GRAVITY_PARTICLE = 1200;
+
+// Difficulty-based scaling helpers (progressively speed up gameplay)
+function difficultyScale(perUnit = 0.12, cap = 2.0) {
+  // Returns a multiplier that grows with difficulty but stays bounded
+  return Math.min(1 + difficulty * perUnit, cap);
+}
+function currentFruitGravity() { return GRAVITY_FRUIT * difficultyScale(0.12, 2.0); }
+function currentBombGravity() { return GRAVITY_BOMB * difficultyScale(0.12, 2.0); }
+function currentParticleGravity() { return GRAVITY_PARTICLE * difficultyScale(0.10, 1.8); }
 
 // Audio
 const bgm = new Audio('sounds/BACKGROUND/Revenge and Thunder.mp3');
@@ -93,9 +121,9 @@ let muted = false;
 function setMuted(next) {
   muted = next;
   bgm.muted = muted;
-  if (soundToggleBtn) {
-    soundToggleBtn.setAttribute('aria-pressed', String(muted));
-    soundToggleBtn.textContent = muted ? 'Sound on' : 'Sound off';
+  for (const btn of getAllSoundToggleBtns()) {
+    btn.setAttribute('aria-pressed', String(muted));
+    btn.textContent = muted ? 'Sound on' : 'Sound off';
   }
 }
 
@@ -110,7 +138,7 @@ class Particle {
     this.size = rand(2, 4);
   }
   update(dt) {
-    this.vy += GRAVITY_PARTICLE * dt;
+    this.vy += currentParticleGravity() * dt;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     this.life -= dt;
@@ -176,7 +204,7 @@ class Fruit {
   }
   update(dt) {
     if (!this.alive) return;
-    this.vy += GRAVITY_FRUIT * dt;
+    this.vy += currentFruitGravity() * dt;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     this.rotation += this.spin * dt;
@@ -211,14 +239,14 @@ class Fruit {
 class Bomb {
   constructor(x, y, vx, vy) {
     this.x = x; this.y = y; this.vx = vx; this.vy = vy;
-    this.radius = 20;
+    this.radius = 66;
     this.alive = true;
     this.spin = rand(-3, 3);
     this.angle = 0;
   }
   update(dt) {
     if (!this.alive) return;
-    this.vy += GRAVITY_BOMB * dt;
+    this.vy += currentBombGravity() * dt;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     this.angle += this.spin * dt;
@@ -229,12 +257,20 @@ class Bomb {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    ctx.fillStyle = '#2b2f3a';
-    ctx.beginPath();
-    ctx.arc(0, 0, this.radius, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = '#e84e4e';
-    ctx.fillRect(-4, -this.radius - 8, 8, 12);
+    if (bombImg.complete && bombImg.naturalWidth > 0 && bombImg.naturalHeight > 0) {
+      // Preserve intrinsic aspect ratio of bomb.png
+      const targetHeight = this.radius * 2;
+      const aspect = bombImg.naturalWidth / bombImg.naturalHeight;
+      const targetWidth = targetHeight * aspect;
+      ctx.drawImage(bombImg, -targetWidth / 2, -targetHeight / 2, targetWidth, targetHeight);
+    } else {
+      ctx.fillStyle = '#2b2f3a';
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#e84e4e';
+      ctx.fillRect(-4, -this.radius - 8, 8, 12);
+    }
     ctx.restore();
   }
 }
@@ -247,7 +283,7 @@ let lives = 3;
 let running = false;
 let spawnTimer = 0;
 let difficulty = 1;
-const defaultIntro = 'Mis ei mahu pitsale ega kokteili peale, peab jõudma gini sisse! Lõika koriandrid, greibid ja basiilikud ribadeks enne, kui kelner nad kompostihunnikusse saadab.';
+const defaultIntro = 'Mis ei mahu pitsale ega kokteili peale, peab jõudma gini sisse! Slici koriandrid, greibid ja basiilikud ribadeks enne, kui pizzakokk need komposti saadab. Aga ole valvel – suure tükeldamise hoos võib lauale sattuda ka mõni ginipudel.';
 
 const blade = new BladeTrail();
 let isPointerDown = false;
@@ -310,9 +346,11 @@ function gameOver() {
 function spawnWave() {
   const base = 1;
   const maxExtra = 2; // fewer at start
-  const count = Math.floor(rand(base, base + Math.min(maxExtra, 1 + difficulty * 0.5)));
+  // Increase count slowly with difficulty
+  const count = Math.floor(rand(base, base + Math.min(maxExtra, 1 + difficulty * 0.6)));
   for (let i = 0; i < count; i++) {
-    const isBomb = Math.random() < Math.min(0.08 + difficulty * 0.02, 0.28); // lower bomb frequency
+    // 1:1 ratio with fruit: 50% chance to spawn a bomb
+    const isBomb = Math.random() < 0.5;
     const margin = 100;
     const x = rand(margin, Math.max(margin + 1, cssWidth - margin));
     const y = cssHeight + rand(40, 120);
@@ -320,14 +358,15 @@ function spawnWave() {
     const apexY = rand(cssHeight * 0.2, cssHeight * 0.55);
     const rise = Math.max(80, (y - apexY));
     // v^2 = u^2 + 2as → u = -sqrt(2 * g * rise)
-    const vy = -Math.sqrt(2 * GRAVITY_FRUIT * rise);
+    const vy = -Math.sqrt(2 * currentFruitGravity() * rise);
     // Horizontal velocity scales with screen width; keep relatively calm
     const widthScale = Math.max(0.9, Math.min(1.8, cssWidth / 430));
-    const vx = rand(-180, 180) * widthScale;
+    const vx = rand(-180, 180) * widthScale * difficultyScale(0.08, 1.6);
     if (isBomb) {
       bombs.push(new Bomb(x, y, vx, vy));
     } else {
-      const spriteName = choice(fruitSpriteNames);
+      // Prefer apples more often (assume '1.png' is apple)
+      const spriteName = weightedChoice(fruitSpriteNames, (name) => name === '1.png' ? 4 : 1);
       fruits.push(new Fruit(x, y, vx, vy, spriteName));
     }
   }
@@ -366,9 +405,8 @@ function handleSlice(p0, p1) {
     if (lineIntersectsCircle(p0, p1, bomb.x, bomb.y, bomb.radius)) {
       bomb.alive = false;
       for (let i = 0; i < 35; i++) particles.push(new Particle(bomb.x, bomb.y, '#ff8a8a'));
-      lives = 0;
-      renderLives();
-      gameOver();
+      // Cutting a bomb costs one life instead of instant game over
+      loseLife();
     }
   }
 }
@@ -420,18 +458,26 @@ startBtn.addEventListener('click', () => {
   running = true;
   // Preload a few images to avoid first-frame blanks
   for (const n of fruitSpriteNames) getImage(n);
+  // Preload bomb image
+  void bombImg.width;
   // Start background music (after user gesture)
   ensureBgm();
 });
 
 // If a sound toggle exists (older UI), keep it working; otherwise, ignore
-if (soundToggleBtn) {
-  soundToggleBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    setMuted(!muted);
-    ensureBgm();
-  });
+// Wire up any sound toggle buttons present on the page
+function wireSoundButtons() {
+  const buttons = getAllSoundToggleBtns();
+  for (const btn of buttons) {
+    const handler = (e) => {
+      e.stopPropagation();
+      setMuted(!muted);
+      ensureBgm();
+    };
+    btn.addEventListener('click', handler);
+  }
 }
+wireSoundButtons();
 
 let prev = performance.now();
 function frame(now) {
@@ -444,8 +490,11 @@ function frame(now) {
     spawnTimer -= dt;
     if (spawnTimer <= 0) {
       spawnWave();
-      spawnTimer = rand(0.9, 1.5) / Math.sqrt(0.7 + difficulty * 0.12);
-      difficulty += 0.015;
+      // Spawn faster as difficulty scales
+      const spawnSpeed = Math.sqrt(0.7 + difficulty * 0.16);
+      spawnTimer = rand(0.8, 1.35) / spawnSpeed;
+      // Increase difficulty slightly faster over time
+      difficulty += 0.02;
     }
 
     for (const f of fruits) f.update(dt);
